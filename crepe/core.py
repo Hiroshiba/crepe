@@ -153,7 +153,7 @@ def to_viterbi_cents(salience):
                      range(len(observations))])
 
 
-def get_activation(audio, sr, model_capacity='full', center=True, step_size=10,
+def get_activation(audio, sr, model_framework='keras', model_capacity='full', center=True, step_size=10,
                    verbose=1):
     """
     
@@ -182,7 +182,15 @@ def get_activation(audio, sr, model_capacity='full', center=True, step_size=10,
     activation : np.ndarray [shape=(T, 360)]
         The raw activation matrix
     """
-    model = build_and_load_model(model_capacity)
+    if model_framework == 'keras':
+        model = build_and_load_model(model_capacity)
+    elif model_framework=='pytorch':
+        import torch
+        from converted_pytorch import KitModel
+        model = torch.load("converted_pytorch")
+        model.eval()
+    else:
+        raise ValueError(model_framework)
 
     if len(audio.shape) == 2:
         audio = audio.mean(1)  # make mono
@@ -209,7 +217,15 @@ def get_activation(audio, sr, model_capacity='full', center=True, step_size=10,
     frames /= np.std(frames, axis=1)[:, np.newaxis]
 
     # run prediction and convert the frequency bin weights to Hz
-    return model.predict(frames, verbose=verbose)
+    if model_framework == 'keras':
+        output = model.predict(frames, verbose=verbose)
+    elif model_framework == 'pytorch':
+        import torch
+        with torch.no_grad():
+            output = model.forward(torch.from_numpy(frames)).numpy()
+    else:
+        raise ValueError(model_framework)
+    return output
 
 
 def predict(audio, sr, model_capacity='full',
