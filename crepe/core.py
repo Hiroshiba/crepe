@@ -153,7 +153,7 @@ def to_viterbi_cents(salience):
                      range(len(observations))])
 
 
-def get_activation(audio, sr, model_framework='keras', model_capacity='full', center=True, step_size=10,
+def get_activation(audio, sr, model_framework='pytorch', model_capacity='full', center=True, step_size=10,
                    verbose=1):
     """
     
@@ -188,6 +188,7 @@ def get_activation(audio, sr, model_framework='keras', model_capacity='full', ce
         import torch
         from converted_pytorch import KitModel
         model = torch.load("converted_pytorch")
+        model.to('cuda')
         model.eval()
     else:
         raise ValueError(model_framework)
@@ -222,7 +223,7 @@ def get_activation(audio, sr, model_framework='keras', model_capacity='full', ce
     elif model_framework == 'pytorch':
         import torch
         with torch.no_grad():
-            output = model.forward(torch.from_numpy(frames)).numpy()
+            output = model.forward(torch.tensor(frames, device='cuda')).cpu().numpy()
     else:
         raise ValueError(model_framework)
     return output
