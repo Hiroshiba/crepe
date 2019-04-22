@@ -10,8 +10,9 @@ except ImportError:
     from urllib import urlretrieve
 
 model_capacities = ['tiny', 'small', 'medium', 'large', 'full']
-weight_files = ['model-{}.h5'.format(cap) for cap in model_capacities]
+weight_files = ['model-{}.h5'.format(cap) for cap in model_capacities] + ['pytorch-model-full.pth']
 base_url = 'https://github.com/marl/crepe/raw/models/'
+pytorch_base_url = 'https://github.com/Hiroshiba/crepe/releases/download/v0.0.7-pt/'
 
 if len(sys.argv) > 1 and sys.argv[1] == 'sdist':
     # exclude the weight files in sdist
@@ -25,7 +26,10 @@ else:
             compressed_path = os.path.join('crepe', compressed_file)
             if not os.path.isfile(compressed_file):
                 print('Downloading weight file {} ...'.format(compressed_file))
-                urlretrieve(base_url + compressed_file, compressed_path)
+                if 'pytorch' not in compressed_file:
+                    urlretrieve(base_url + compressed_file, compressed_path)
+                else:
+                    urlretrieve(pytorch_base_url + compressed_file, compressed_path)
             print('Decompressing ...')
             with bz2.BZ2File(compressed_path, 'rb') as source:
                 with open(weight_path, 'wb') as target:

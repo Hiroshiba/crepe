@@ -5,12 +5,22 @@ import os
 import re
 import sys
 
-from scipy.io import wavfile
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
+from scipy.io import wavfile
 
 # store as a global variable, since we only support a few models for now
+from crepe.pytorch_model import PytorchModel
+
 models = {
+    'tiny': None,
+    'small': None,
+    'medium': None,
+    'large': None,
+    'full': None
+}
+
+pytorch_models = {
     'tiny': None,
     'small': None,
     'medium': None,
@@ -80,6 +90,25 @@ def build_and_load_model(model_capacity):
         models[model_capacity] = model
 
     return models[model_capacity]
+
+
+def build_and_load_pytorch_model(model_capacity):
+    assert model_capacity == 'full'
+    import torch
+    if pytorch_models[model_capacity] is None:
+        model = PytorchModel()
+
+        package_dir = os.path.dirname(os.path.realpath(__file__))
+        filename = "pytorch-model-{}.pth".format(model_capacity)
+        model.load_state_dict(torch.load(os.path.join(package_dir, filename)), strict=True)
+
+        model.eval()
+        if torch.cuda.is_available():
+            model.to('cuda')
+
+        pytorch_models[model_capacity] = model
+
+    return pytorch_models[model_capacity]
 
 
 def output_path(file, suffix, output_dir):
@@ -153,8 +182,8 @@ def to_viterbi_cents(salience):
                      range(len(observations))])
 
 
-def get_activation(audio, sr, model_framework='pytorch', model_capacity='full', center=True, step_size=10,
-                   verbose=1):
+def get_activation(audio, sr, model_framework='pytorch', model_capacity='full',
+                   center=True, step_size=10, verbose=1):
     """
     
     Parameters
@@ -184,12 +213,8 @@ def get_activation(audio, sr, model_framework='pytorch', model_capacity='full', 
     """
     if model_framework == 'keras':
         model = build_and_load_model(model_capacity)
-    elif model_framework=='pytorch':
-        import torch
-        from converted_pytorch import KitModel
-        model = torch.load("converted_pytorch")
-        model.to('cuda')
-        model.eval()
+    elif model_framework == 'pytorch':
+        model = build_and_load_pytorch_model(model_capacity)
     else:
         raise ValueError(model_framework)
 
@@ -223,7 +248,8 @@ def get_activation(audio, sr, model_framework='pytorch', model_capacity='full', 
     elif model_framework == 'pytorch':
         import torch
         with torch.no_grad():
-            output = model.forward(torch.tensor(frames, device='cuda')).cpu().numpy()
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
+            output = model.forward(torch.tensor(frames, device=device)).cpu().numpy()
     else:
         raise ValueError(model_framework)
     return output
@@ -436,4 +462,3 @@ def process_file(file, output=None, model_capacity='full', viterbi=False,
         imwrite(plot_file, (255 * image).astype(np.uint8))
         if verbose:
             print("CREPE: Saved the salience plot at {}".format(plot_file))
-
